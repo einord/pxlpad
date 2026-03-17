@@ -36,6 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -48,7 +53,7 @@ jobs:
 
       - name: Install server dependencies
         working-directory: server
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -70,6 +75,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -77,11 +87,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: client
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build PWA
         working-directory: client
-        run: npm run build
+        run: pnpm run build
 
       - name: Package client
         run: cd client && tar -czf ../pxlpad-client-${{ needs.release-please.outputs.version }}.tar.gz dist/

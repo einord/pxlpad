@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -27,11 +32,11 @@ jobs:
 
       - name: Install server dependencies
         working-directory: server
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build frontend
         working-directory: server
-        run: npm run build
+        run: pnpm run build
 
       - name: Check Rust
         working-directory: server/src-tauri
@@ -46,6 +51,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,15 +63,15 @@ jobs:
 
       - name: Install dependencies
         working-directory: client
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Type check
         working-directory: client
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       - name: Build
         working-directory: client
-        run: npm run build
+        run: pnpm run build
 
   lint-extension:
     runs-on: ubuntu-latest
