@@ -26,11 +26,22 @@ pnpm ext:pack     # Package extension to /tmp/pxlpad.aseprite-extension
 
 ## Code conventions
 
-### General
+### Principles
+- **Single responsibility** — each file, function, and module should do one thing well
+- **Ask rather than guess** — when requirements, design decisions, or expected behavior are unclear, ask the user before making assumptions
 - All code, comments, and variable names in English
-- Keep files focused — one concern per file
 - Prefer simple, direct solutions over abstractions
 - No unnecessary error handling for internal code paths
+
+### File organization
+- **Max 400 lines per file** — if a file exceeds this, split it by responsibility
+- **Co-locate related files** using nested naming for IDE grouping:
+  - `toolbar.ts` — logic
+  - `toolbar.css.ts` — styles (if separated)
+  - `toolbar.types.ts` — types (if complex enough)
+- Place new files next to related code, not in a flat global folder
+- Client structure: `client/src/` with logical groupings as the project grows
+- Server structure: Rust in `server/src-tauri/src/`, frontend in `server/src/`
 
 ### TypeScript (client/)
 - Strict TypeScript — no `any`, no `as` casts unless unavoidable
