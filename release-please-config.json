@@ -1,0 +1,17 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "component": "pxlpad",
+      "extra-files": [
+        "server/package.json",
+        "server/src-tauri/Cargo.toml",
+        "server/src-tauri/tauri.conf.json",
+        "client/package.json",
+        "extension/package.json"
+      ]
+    }
+  },
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true
+}

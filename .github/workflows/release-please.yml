@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-server:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    strategy:
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: server
+          tagName: ${{ needs.release-please.outputs.tag_name }}
+          releaseName: "Pxlpad ${{ needs.release-please.outputs.version }}"
+          releaseBody: "See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details."
+          releaseDraft: false
+          prerelease: false
+          args: --target ${{ matrix.target }}
+
+  build-client:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build PWA
+        working-directory: client
+        run: npm run build
+
+      - name: Package client
+        run: cd client && tar -czf ../pxlpad-client-${{ needs.release-please.outputs.version }}.tar.gz dist/
+
+      - name: Upload client artifact to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} pxlpad-client-${{ needs.release-please.outputs.version }}.tar.gz
+
+  build-extension:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package Aseprite extension
+        run: cd extension && zip -r ../pxlpad-extension-${{ needs.release-please.outputs.version }}.aseprite-extension .
+
+      - name: Upload extension artifact to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} pxlpad-extension-${{ needs.release-please.outputs.version }}.aseprite-extension

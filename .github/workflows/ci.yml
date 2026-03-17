@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-server:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server/src-tauri
+
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: server
+        run: npm run build
+
+      - name: Check Rust
+        working-directory: server/src-tauri
+        run: cargo check
+
+      - name: Clippy
+        working-directory: server/src-tauri
+        run: cargo clippy -- -D warnings
+
+  build-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Type check
+        working-directory: client
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: client
+        run: npm run build
+
+  lint-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate extension package.json
+        run: node -e "const p = require('./extension/package.json'); if (!p.name || !p.version) { process.exit(1); }"

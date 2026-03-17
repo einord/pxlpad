@@ -1,0 +1,6 @@
+{
+  "name": "pxlpad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "iPad pixel art editor that syncs with Aseprite in real-time"
+}
