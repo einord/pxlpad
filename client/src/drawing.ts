@@ -353,6 +353,9 @@ export function setupDrawingInput(
     if (!isDrawingPointer(e)) return;
     if (!state.pixelBuffer) return;
 
+    // Prevent viewport drag from consuming this event
+    e.stopPropagation();
+
     currentPressure = e.pressure;
     state.isDrawing = true;
     pauseViewportDrag();
@@ -438,13 +441,14 @@ export function setupDrawingInput(
     }
   }
 
-  // Attach to the canvas element that pixi-viewport renders into
+  // Attach to the canvas element — use capture phase so we handle
+  // pen/mouse events before pixi-viewport's drag plugin can consume them.
   const domElement = viewport.options.events!.domElement as HTMLElement;
 
-  domElement.addEventListener("pointerdown", handlePointerDown);
-  domElement.addEventListener("pointermove", handlePointerMove);
-  domElement.addEventListener("pointerup", handlePointerUp);
-  domElement.addEventListener("pointerleave", handlePointerLeave);
+  domElement.addEventListener("pointerdown", handlePointerDown, true);
+  domElement.addEventListener("pointermove", handlePointerMove, true);
+  domElement.addEventListener("pointerup", handlePointerUp, true);
+  domElement.addEventListener("pointerleave", handlePointerLeave, true);
 
   // Suppress currentPressure unused warning — exposed for future use
   void currentPressure;

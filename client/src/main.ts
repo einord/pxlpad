@@ -113,7 +113,7 @@ function setupViewport(app: Application): Viewport {
   viewport
     .drag({ mouseButtons: "all" })
     .pinch()
-    .wheel()
+    .wheel({ smooth: 3, trackpadPinch: true, wheelZoom: false })
     .decelerate()
     .clampZoom({ minScale: 0.1, maxScale: 40 });
 
