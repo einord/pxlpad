@@ -211,13 +211,22 @@ function applySpriteData(
     currentSprite = sprite;
     viewport.addChild(sprite);
 
-    // Center and fit sprite in viewport with some padding
-    const padding = 80;
-    const scaleX = (viewport.screenWidth - padding * 2) / width;
-    const scaleY = (viewport.screenHeight - padding * 2) / height;
-    const fitScale = Math.min(scaleX, scaleY);
+    // Center and fit sprite in viewport, accounting for UI panels
+    const toolbarWidth = 60;   // left toolbar
+    const paletteWidth = 92;   // right color palette
+    const topBarHeight = 48;   // top bar
+    const bottomBarHeight = 48; // bottom bar
+    const margin = 24;         // extra breathing room
+
+    const availW = viewport.screenWidth - toolbarWidth - paletteWidth - margin * 2;
+    const availH = viewport.screenHeight - topBarHeight - bottomBarHeight - margin * 2;
+    const fitScale = Math.min(availW / width, availH / height);
+
     viewport.setZoom(fitScale, true);
-    viewport.moveCenter(width / 2, height / 2);
+    // Offset center slightly to account for asymmetric panels
+    const offsetX = (toolbarWidth - paletteWidth) / 2 / fitScale;
+    const offsetY = (topBarHeight - bottomBarHeight) / 2 / fitScale;
+    viewport.moveCenter(width / 2 - offsetX, height / 2 - offsetY);
     ui?.setZoomLevel(fitScale * 100);
 
     // Set up drawing input now that we have a texture source
