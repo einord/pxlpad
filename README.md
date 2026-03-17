@@ -134,12 +134,22 @@ zip -r pxlpad.aseprite-extension .
 
 ### Development workflow
 
-For the fastest iteration loop:
+Start everything with a single command from the project root:
 
-1. Start the Tauri dev server: `cd server && pnpm tauri dev`
-2. Start the client dev server: `cd client && pnpm run dev`
-3. Open Aseprite with the extension installed
-4. Open `http://localhost:5173` on your iPad (or `http://<mac-ip>:5173`)
+```bash
+pnpm dev
+```
+
+This starts both the Tauri server and the client dev server concurrently. The client is served with `--host` so your iPad can reach it.
+
+You can also start them individually:
+
+```bash
+pnpm dev:server    # Tauri server only
+pnpm dev:client    # PWA client only
+```
+
+Then open Aseprite with the extension installed and navigate to `http://<mac-ip>:5173` on your iPad.
 
 The client dev server hot-reloads on file changes. The Tauri dev server recompiles Rust code on save.
 
