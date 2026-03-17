@@ -2,17 +2,10 @@
 -- Syncs sprite data with a local WebSocket server.
 
 -- ---------------------------------------------------------------------------
--- Preferences / defaults
--- ---------------------------------------------------------------------------
-
-if plugin.preferences.serverAddress == nil then
-  plugin.preferences.serverAddress = "ws://localhost:9874"
-end
-
--- ---------------------------------------------------------------------------
 -- State
 -- ---------------------------------------------------------------------------
 
+local serverAddress = "ws://localhost:9874"
 local ws = nil                  -- current WebSocket connection
 local connected = false
 local spriteChangeListener = nil
@@ -294,7 +287,7 @@ local function connectToServer()
   end
   connected = false
 
-  local url = plugin.preferences.serverAddress
+  local url = serverAddress
   print("[pxlpad] Connecting to " .. url .. " ...")
 
   local ok, result = pcall(function()
@@ -378,6 +371,13 @@ end
 
 function init(p)
   print("[pxlpad] Extension loading...")
+
+  -- Load preferences
+  if p.preferences.serverAddress then
+    serverAddress = p.preferences.serverAddress
+  else
+    p.preferences.serverAddress = serverAddress
+  end
 
   p:newCommand{
     id = "pxlpad_connect",
