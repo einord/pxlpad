@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Tauri
+server/src-tauri/target/
+
+# PWA generated
+dev-dist/
+sw.js
+workbox-*.js
+
+# Environment
+.env
+.env.local
