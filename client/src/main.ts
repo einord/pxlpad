@@ -5,9 +5,17 @@ import {
   Sprite,
   Texture,
   TilingSprite,
+  BufferImageSource,
 } from "pixi.js";
 import { Viewport } from "pixi-viewport";
-import { BufferImageSource } from "pixi.js";
+import { createUI } from "./ui.ts";
+import type { UICallbacks } from "./ui.ts";
+import {
+  createDrawingState,
+  updatePixelBuffer,
+  setupDrawingInput,
+} from "./drawing.ts";
+import type { ToolType, DrawCallbacks } from "./drawing.ts";
 
 const CHECKERBOARD_SIZE = 16;
 const CHECKERBOARD_COLOR_A = 0xcccccc;
@@ -19,32 +27,25 @@ const WS_RECONNECT_INTERVAL_MS = 3000;
 // ── State ───────────────────────────────────────────────────────────────
 
 interface SpriteInfo {
-  id: string;
-  name: string;
+  filename: string;
   width: number;
   height: number;
+  colorMode: number;
 }
 
 let ws: WebSocket | null = null;
 let spriteList: SpriteInfo[] = [];
 let currentSprite: Sprite | null = null;
 let currentTextureSource: BufferImageSource | null = null;
-let statusEl: HTMLDivElement | null = null;
 
-// ── Status indicator ────────────────────────────────────────────────────
-
-function setStatus(text: string, color: "red" | "green"): void {
-  if (!statusEl) return;
-  statusEl.textContent = text;
-  statusEl.style.backgroundColor =
-    color === "green" ? "rgba(34,139,34,0.75)" : "rgba(180,30,30,0.75)";
-}
+const drawingState = createDrawingState();
+let ui: ReturnType<typeof createUI> | null = null;
 
 // ── Checkerboard background ─────────────────────────────────────────────
 
 async function createCheckerboardBackground(
   app: Application,
-  viewport: Viewport
+  viewport: Viewport,
 ): Promise<void> {
   const tileSize = CHECKERBOARD_SIZE * 2;
   const checkerGfx = new Graphics();
@@ -62,7 +63,7 @@ async function createCheckerboardBackground(
     CHECKERBOARD_SIZE,
     CHECKERBOARD_SIZE,
     CHECKERBOARD_SIZE,
-    CHECKERBOARD_SIZE
+    CHECKERBOARD_SIZE,
   );
   checkerGfx.fill(CHECKERBOARD_COLOR_A);
 
@@ -125,6 +126,11 @@ function setupViewport(app: Application): Viewport {
     viewport.resize(window.innerWidth, window.innerHeight);
   });
 
+  // Track zoom level changes
+  viewport.on("zoomed", () => {
+    ui?.setZoomLevel(viewport.scale.x * 100);
+  });
+
   return viewport;
 }
 
@@ -144,17 +150,18 @@ function renderSpriteData(
   viewport: Viewport,
   data: string,
   width: number,
-  height: number
+  height: number,
 ): void {
   const rgbaBytes = decodeBase64ToUint8Array(data);
 
+  // Update the drawing state's local pixel buffer
+  updatePixelBuffer(drawingState, rgbaBytes, width, height);
+
   if (currentTextureSource && currentSprite) {
-    // Update existing texture source in-place
     currentTextureSource.resource = rgbaBytes;
     currentTextureSource.resize(width, height);
     currentTextureSource.update();
   } else {
-    // Create new texture source and sprite
     const source = new BufferImageSource({
       resource: rgbaBytes,
       width,
@@ -166,15 +173,31 @@ function renderSpriteData(
     currentTextureSource = source;
 
     const texture = new Texture({ source });
-
     const sprite = new Sprite(texture);
     sprite.position.set(0, 0);
 
     currentSprite = sprite;
     viewport.addChild(sprite);
+
+    // Set up drawing input now that we have a texture source
+    const drawCallbacks: DrawCallbacks = {
+      onDraw: (x, y, color, tool) => {
+        sendMessage({ type: "draw", x, y, color, tool });
+      },
+      onColorPicked: (color) => {
+        drawingState.foregroundColor = color;
+        ui?.setForegroundColor(color);
+        ui?.addRecentColor(color);
+      },
+      onTextureUpdate: () => {
+        // Texture already updated by drawing module
+      },
+    };
+
+    setupDrawingInput(viewport, drawingState, source, drawCallbacks);
   }
 
-  setStatus("Synced", "green");
+  ui?.setStatus("Synced", true);
 }
 
 // ── WebSocket ───────────────────────────────────────────────────────────
@@ -201,12 +224,9 @@ function connectWebSocket(viewport: Viewport): void {
 
     ws.addEventListener("open", () => {
       console.log("[WS] Connected to", wsUrl);
-      setStatus("Connected", "green");
+      ui?.setStatus("Connected", true);
 
-      // Register as client
       sendMessage({ type: "register", role: "client" });
-
-      // Request the sprite list
       sendMessage({ type: "request-sprite-list" });
     });
 
@@ -221,42 +241,48 @@ function connectWebSocket(viewport: Viewport): void {
 
       switch (msg.type) {
         case "sprite-list": {
-          spriteList = msg.sprites as SpriteInfo[];
+          const sprites = msg.sprites as SpriteInfo[];
+          spriteList = sprites;
           console.log("[WS] Sprite list:", spriteList);
 
-          // Auto-request the first sprite
           if (spriteList.length > 0) {
+            const name = spriteList[0].filename || "untitled.ase";
+            ui?.setSpriteName(
+              name.split("/").pop() || name,
+            );
             sendMessage({
               type: "request-sprite-data",
-              spriteId: spriteList[0].id,
+              filename: spriteList[0].filename,
             });
           }
           break;
         }
 
         case "sprite-data": {
-          const { data, width, height } = msg as {
+          const { data, width, height, filename } = msg as {
             data: string;
             width: number;
             height: number;
+            filename: string;
           };
           console.log(`[WS] Sprite data received (${width}x${height})`);
+          if (filename) {
+            ui?.setSpriteName(
+              filename.split("/").pop() || filename,
+            );
+          }
           renderSpriteData(viewport, data, width, height);
           break;
         }
 
         case "sprite-update": {
           console.log("[WS] Sprite update notification");
-          // Request fresh data
-          const spriteId = (msg.spriteId as string) ?? spriteList[0]?.id;
-          if (spriteId) {
-            sendMessage({ type: "request-sprite-data", spriteId });
-          }
+          sendMessage({ type: "request-sprite-data" });
           break;
         }
 
         case "status": {
-          console.log("[WS] Status:", msg.message);
+          console.log("[WS] Status:", msg);
           break;
         }
 
@@ -266,12 +292,8 @@ function connectWebSocket(viewport: Viewport): void {
     });
 
     ws.addEventListener("close", () => {
-      console.log(
-        "[WS] Disconnected. Reconnecting in",
-        WS_RECONNECT_INTERVAL_MS,
-        "ms..."
-      );
-      setStatus("Disconnected", "red");
+      console.log("[WS] Disconnected. Reconnecting in", WS_RECONNECT_INTERVAL_MS, "ms...");
+      ui?.setStatus("Disconnected", false);
       scheduleReconnect();
     });
 
@@ -296,12 +318,51 @@ function connectWebSocket(viewport: Viewport): void {
 // ── Main ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  // Create status indicator
-  statusEl = document.getElementById("ws-status") as HTMLDivElement;
-  setStatus("Disconnected", "red");
-
   const app = await createApp();
   const viewport = setupViewport(app);
+
+  // Create UI overlay with callbacks wired to drawing state
+  const uiCallbacks: UICallbacks = {
+    onToolChange: (tool) => {
+      drawingState.tool = tool as ToolType;
+    },
+    onColorChange: (color) => {
+      drawingState.foregroundColor = color;
+    },
+    onUndo: () => {
+      sendMessage({ type: "undo" });
+    },
+    onRedo: () => {
+      sendMessage({ type: "redo" });
+    },
+    onGridToggle: () => {
+      // TODO: toggle pixel grid overlay
+      console.log("[UI] Grid toggle");
+    },
+    onZoomPreset: (scale) => {
+      viewport.setZoom(scale, true);
+      ui?.setZoomLevel(scale * 100);
+    },
+    onBrushSizeChange: (size) => {
+      drawingState.brushSize = size;
+    },
+  };
+
+  ui = createUI(uiCallbacks);
+  ui.setStatus("Disconnected", false);
+  ui.setZoomLevel(viewport.scale.x * 100);
+
+  // Track cursor position over canvas
+  const canvas = app.canvas as HTMLCanvasElement;
+  canvas.addEventListener("pointermove", (e: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const world = viewport.toWorld(screenX, screenY);
+    const px = Math.floor(world.x);
+    const py = Math.floor(world.y);
+    ui?.setCursorPosition(px, py);
+  });
 
   await createCheckerboardBackground(app, viewport);
 
