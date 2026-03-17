@@ -165,7 +165,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, state: SharedSta
                         // Verify sender is an extension.
                         let is_extension = s
                             .get(&id)
-                            .map_or(false, |p| matches!(p.role, Some(Role::Extension)));
+                            .is_some_and(|p| matches!(p.role, Some(Role::Extension)));
                         if !is_extension {
                             eprintln!("Non-extension peer {id} sent {}", envelope.msg_type);
                             continue;
@@ -185,7 +185,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, state: SharedSta
                         // Verify sender is a client.
                         let is_client = s
                             .get(&id)
-                            .map_or(false, |p| matches!(p.role, Some(Role::Client)));
+                            .is_some_and(|p| matches!(p.role, Some(Role::Client)));
                         if !is_client {
                             eprintln!("Non-client peer {id} sent {}", envelope.msg_type);
                             continue;
