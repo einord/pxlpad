@@ -211,6 +211,15 @@ function applySpriteData(
     currentSprite = sprite;
     viewport.addChild(sprite);
 
+    // Center and fit sprite in viewport with some padding
+    const padding = 80;
+    const scaleX = (viewport.screenWidth - padding * 2) / width;
+    const scaleY = (viewport.screenHeight - padding * 2) / height;
+    const fitScale = Math.min(scaleX, scaleY);
+    viewport.setZoom(fitScale, true);
+    viewport.moveCenter(width / 2, height / 2);
+    ui?.setZoomLevel(fitScale * 100);
+
     // Set up drawing input now that we have a texture source
     const drawCallbacks: DrawCallbacks = {
       onDraw: (x, y, color, tool) => {
