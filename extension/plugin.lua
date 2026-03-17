@@ -27,36 +27,25 @@ local function base64Encode(bytes)
     local b0 = bytes[i]
     local b1 = bytes[i + 1]
     local b2 = bytes[i + 2]
-
     local n = b0 * 65536 + b1 * 256 + b2
 
-    local c0 = math.floor(n / 262144)
-    local c1 = math.floor(n / 4096) % 64
-    local c2 = math.floor(n / 64) % 64
-    local c3 = n % 64
-
-    result[#result + 1] = b64chars:sub(c0 + 1, c0 + 1)
-    result[#result + 1] = b64chars:sub(c1 + 1, c1 + 1)
-    result[#result + 1] = b64chars:sub(c2 + 1, c2 + 1)
-    result[#result + 1] = b64chars:sub(c3 + 1, c3 + 1)
+    result[#result + 1] = b64chars:sub(math.floor(n / 262144) + 1, math.floor(n / 262144) + 1)
+    result[#result + 1] = b64chars:sub(math.floor(n / 4096) % 64 + 1, math.floor(n / 4096) % 64 + 1)
+    result[#result + 1] = b64chars:sub(math.floor(n / 64) % 64 + 1, math.floor(n / 64) % 64 + 1)
+    result[#result + 1] = b64chars:sub(n % 64 + 1, n % 64 + 1)
 
     i = i + 3
   end
 
   local remaining = len - i + 1
   if remaining == 2 then
-    local b0 = bytes[i]
-    local b1 = bytes[i + 1]
-    local n = b0 * 65536 + b1 * 256
-
+    local n = bytes[i] * 65536 + bytes[i + 1] * 256
     result[#result + 1] = b64chars:sub(math.floor(n / 262144) + 1, math.floor(n / 262144) + 1)
     result[#result + 1] = b64chars:sub(math.floor(n / 4096) % 64 + 1, math.floor(n / 4096) % 64 + 1)
     result[#result + 1] = b64chars:sub(math.floor(n / 64) % 64 + 1, math.floor(n / 64) % 64 + 1)
     result[#result + 1] = "="
   elseif remaining == 1 then
-    local b0 = bytes[i]
-    local n = b0 * 65536
-
+    local n = bytes[i] * 65536
     result[#result + 1] = b64chars:sub(math.floor(n / 262144) + 1, math.floor(n / 262144) + 1)
     result[#result + 1] = b64chars:sub(math.floor(n / 4096) % 64 + 1, math.floor(n / 4096) % 64 + 1)
     result[#result + 1] = "=="
@@ -180,16 +169,14 @@ local function sendSpriteData(sprite)
   local pixelData = getSpritePixelData(sprite, frameNumber)
   if not pixelData then return end
 
-  local msg = jsonEncode({
+  ws:sendText(jsonEncode({
     type = "sprite-data",
     filename = sprite.filename or "",
     width = sprite.width,
     height = sprite.height,
     frame = frameNumber,
     data = pixelData,
-  })
-
-  ws:sendText(msg)
+  }))
 end
 
 local function attachSpriteListener(sprite)
@@ -216,12 +203,10 @@ local function sendSpriteList()
     }
   end
 
-  local msg = jsonEncode({
+  ws:sendText(jsonEncode({
     type = "sprite-list",
     sprites = list,
-  })
-
-  ws:sendText(msg)
+  }))
 end
 
 -- ---------------------------------------------------------------------------
@@ -263,21 +248,50 @@ local function handleDrawCommand(data)
 end
 
 -- ---------------------------------------------------------------------------
--- Registration message
+-- WebSocket connection
 -- ---------------------------------------------------------------------------
 
-local function sendRegister()
-  if not connected or not ws then return end
+local function onConnected()
+  connected = true
+  print("[pxlpad] Connected to " .. serverAddress)
 
+  -- Register with the server
   ws:sendText(jsonEncode({
     type = "register",
     role = "extension",
   }))
+
+  -- Send sprite list
+  sendSpriteList()
+
+  -- Send initial sprite data if there is an active sprite
+  if app.sprite then
+    sendSpriteData(app.sprite)
+    attachSpriteListener(app.sprite)
+  end
 end
 
--- ---------------------------------------------------------------------------
--- WebSocket connection
--- ---------------------------------------------------------------------------
+local function onDisconnected(err)
+  connected = false
+  ws = nil
+  print("[pxlpad] Disconnected" .. (err ~= "" and ": " .. err or ""))
+  detachSpriteListener()
+end
+
+local function onMessage(data)
+  local msg = jsonDecode(data)
+  if not msg or not msg.type then return end
+
+  if msg.type == "request-sprite-list" then
+    sendSpriteList()
+  elseif msg.type == "request-sprite-data" then
+    if app.sprite then
+      sendSpriteData(app.sprite)
+    end
+  elseif msg.type == "draw" then
+    handleDrawCommand(msg)
+  end
+end
 
 local function connectToServer()
   -- Clean up any previous connection
@@ -287,47 +301,23 @@ local function connectToServer()
   end
   connected = false
 
-  local url = serverAddress
-  print("[pxlpad] Connecting to " .. url .. " ...")
+  print("[pxlpad] Connecting to " .. serverAddress .. " ...")
 
   local ok, result = pcall(function()
     return WebSocket{
-      url = url,
+      url = serverAddress,
+      deflate = false,
+      minreconnectwait = 2,
+      maxreconnectwait = 10,
 
-      onconnected = function()
-        connected = true
-        print("[pxlpad] Connected to " .. url)
-
-        sendRegister()
-        sendSpriteList()
-
-        if app.sprite then
-          sendSpriteData(app.sprite)
-          attachSpriteListener(app.sprite)
-        end
-      end,
-
-      ondisconnected = function()
-        connected = false
-        ws = nil
-        print("[pxlpad] Disconnected from server")
-        detachSpriteListener()
-      end,
-
-      onreceive = function(message, isBinary)
-        if isBinary then return end
-
-        local data = jsonDecode(message)
-        if not data or not data.type then return end
-
-        if data.type == "request-sprite-list" then
-          sendSpriteList()
-        elseif data.type == "request-sprite-data" then
-          if app.sprite then
-            sendSpriteData(app.sprite)
-          end
-        elseif data.type == "draw" then
-          handleDrawCommand(data)
+      -- Single callback for all events (Aseprite WebSocket API)
+      onreceive = function(messageType, data, err)
+        if messageType == WebSocketMessageType.OPEN then
+          onConnected()
+        elseif messageType == WebSocketMessageType.TEXT then
+          onMessage(data)
+        elseif messageType == WebSocketMessageType.CLOSE then
+          onDisconnected(err or "")
         end
       end,
     }
