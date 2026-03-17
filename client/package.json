@@ -14,10 +14,13 @@
     "vite-plugin-pwa": "^1.2.0"
   },
   "dependencies": {
+    "lucide": "^0.577.0",
     "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.17.1"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

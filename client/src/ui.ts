@@ -1,5 +1,20 @@
 // ── UI overlay for Pxlpad pixel art editor ──────────────────────────────
 
+import { createElement } from "lucide";
+import {
+  Pencil,
+  Eraser,
+  Pipette,
+  PaintBucket,
+  Undo2,
+  Redo2,
+  Grid3x3,
+  Menu,
+  Settings,
+  ChevronDown,
+  ArrowRightLeft,
+} from "lucide";
+
 export interface UICallbacks {
   onToolChange: (tool: string) => void;
   onColorChange: (color: [number, number, number, number]) => void;
@@ -252,14 +267,27 @@ function el<K extends keyof HTMLElementTagNameMap>(
 }
 
 function btn(
-  text: string,
+  content: string | Node,
   className = "pxl-btn",
   onClick?: () => void
 ): HTMLButtonElement {
-  const b = el("button", className, text);
+  const b = el("button", className);
   b.type = "button";
+  if (typeof content === "string") {
+    b.textContent = content;
+  } else {
+    b.appendChild(content);
+  }
   if (onClick) b.addEventListener("click", onClick);
   return b;
+}
+
+function icon(iconData: object, size = 20): SVGElement {
+  return createElement(iconData as Parameters<typeof createElement>[0], {
+    size,
+    strokeWidth: 2,
+    color: "currentColor",
+  }) as unknown as SVGElement;
 }
 
 // ── createUI ────────────────────────────────────────────────────────────
@@ -290,7 +318,7 @@ export function createUI(callbacks: UICallbacks): {
   const topBar = el("div", "pxl-panel");
   topBar.id = "pxl-top-bar";
 
-  const menuBtn = btn("\u2261", "pxl-btn");
+  const menuBtn = btn(icon(Menu), "pxl-btn");
   topBar.appendChild(menuBtn);
 
   const spriteNameEl = el("span", "pxl-sprite-name", "untitled.ase");
@@ -327,7 +355,7 @@ export function createUI(callbacks: UICallbacks): {
 
   topBar.appendChild(contextBar);
 
-  const settingsBtn = btn("\u2699", "pxl-btn");
+  const settingsBtn = btn(icon(Settings), "pxl-btn");
   topBar.appendChild(settingsBtn);
 
   document.body.appendChild(topBar);
@@ -338,25 +366,26 @@ export function createUI(callbacks: UICallbacks): {
 
   interface ToolDef {
     id: string;
-    icon: string;
+    icon: object;
+    label: string;
   }
 
   const tools: ToolDef[] = [
-    { id: "pencil", icon: "\u270F\uFE0F" },
-    { id: "eraser", icon: "\u25FB" },
-    { id: "eyedropper", icon: "\uD83D\uDCA7" },
-    { id: "fill", icon: "\uD83E\uDEA3" },
+    { id: "pencil", icon: Pencil, label: "Pencil" },
+    { id: "eraser", icon: Eraser, label: "Eraser" },
+    { id: "eyedropper", icon: Pipette, label: "Eyedropper" },
+    { id: "fill", icon: PaintBucket, label: "Fill" },
   ];
 
   const toolBtns = new Map<string, HTMLButtonElement>();
 
   for (const tool of tools) {
-    const b = btn(tool.icon, "pxl-btn", () => {
+    const b = btn(icon(tool.icon), "pxl-btn", () => {
       activeTool = tool.id;
       updateToolHighlight();
       callbacks.onToolChange(tool.id);
     });
-    b.title = tool.id;
+    b.title = tool.label;
     if (tool.id === activeTool) b.classList.add("active");
     toolBtns.set(tool.id, b);
     toolbar.appendChild(b);
@@ -382,7 +411,7 @@ export function createUI(callbacks: UICallbacks): {
   bgSwatch.style.backgroundColor = rgbaToCSS(bgColor);
   palette.appendChild(bgSwatch);
 
-  const swapBtn = btn("X", "pxl-btn pxl-btn-sm pxl-swap-btn", () => {
+  const swapBtn = btn(icon(ArrowRightLeft, 14), "pxl-btn pxl-btn-sm pxl-swap-btn", () => {
     const tmp = fgColor;
     fgColor = bgColor;
     bgColor = tmp;
@@ -417,7 +446,7 @@ export function createUI(callbacks: UICallbacks): {
   }
   palette.appendChild(recentGrid);
 
-  const moreBtn = btn("\u25BC More", "pxl-btn pxl-btn-sm pxl-more-btn");
+  const moreBtn = btn(icon(ChevronDown, 16), "pxl-btn pxl-btn-sm pxl-more-btn");
   palette.appendChild(moreBtn);
 
   document.body.appendChild(palette);
@@ -426,16 +455,16 @@ export function createUI(callbacks: UICallbacks): {
   const bottomBar = el("div", "pxl-panel");
   bottomBar.id = "pxl-bottom-bar";
 
-  const undoBtn = btn("\u21B6", "pxl-btn pxl-btn-sm", () => callbacks.onUndo());
+  const undoBtn = btn(icon(Undo2, 18), "pxl-btn pxl-btn-sm", () => callbacks.onUndo());
   bottomBar.appendChild(undoBtn);
 
-  const redoBtn = btn("\u21B7", "pxl-btn pxl-btn-sm", () => callbacks.onRedo());
+  const redoBtn = btn(icon(Redo2, 18), "pxl-btn pxl-btn-sm", () => callbacks.onRedo());
   bottomBar.appendChild(redoBtn);
 
   const sep1 = el("div", "pxl-separator");
   bottomBar.appendChild(sep1);
 
-  const gridBtn = btn("\u229E", "pxl-btn pxl-btn-sm", () => {
+  const gridBtn = btn(icon(Grid3x3, 18), "pxl-btn pxl-btn-sm", () => {
     gridBtn.classList.toggle("active");
     callbacks.onGridToggle();
   });
