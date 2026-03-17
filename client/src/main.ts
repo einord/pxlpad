@@ -21,7 +21,6 @@ const CHECKERBOARD_SIZE = 16;
 const CHECKERBOARD_COLOR_A = 0xcccccc;
 const CHECKERBOARD_COLOR_B = 0xffffff;
 
-const WS_PORT = 9874;
 const WS_RECONNECT_INTERVAL_MS = 3000;
 
 // ── State ───────────────────────────────────────────────────────────────
@@ -209,8 +208,9 @@ function sendMessage(msg: Record<string, unknown>): void {
 }
 
 function connectWebSocket(viewport: Viewport): void {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const wsUrl = `${protocol}//${window.location.hostname}:${WS_PORT}`;
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  // Use Vite proxy path /ws to avoid cross-port issues on iPad Safari
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
 
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -291,8 +291,8 @@ function connectWebSocket(viewport: Viewport): void {
       }
     });
 
-    ws.addEventListener("close", () => {
-      console.log("[WS] Disconnected. Reconnecting in", WS_RECONNECT_INTERVAL_MS, "ms...");
+    ws.addEventListener("close", (ev) => {
+      console.log("[WS] Disconnected. Code:", ev.code, "Reason:", ev.reason);
       ui?.setStatus("Disconnected", false);
       scheduleReconnect();
     });
@@ -349,7 +349,7 @@ async function main(): Promise<void> {
   };
 
   ui = createUI(uiCallbacks);
-  ui.setStatus("Disconnected", false);
+  ui.setStatus("Connecting...", false);
   ui.setZoomLevel(viewport.scale.x * 100);
 
   // Track cursor position over canvas
