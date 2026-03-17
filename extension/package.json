@@ -3,7 +3,7 @@
   "displayName": "Pxlpad",
   "description": "Sync sprites with Pxlpad iPad editor",
   "version": "0.1.0",
-  "author": "einord",
+  "author": "plik",
   "license": "MIT",
   "contributes": {
     "scripts": [
