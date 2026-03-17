@@ -26,6 +26,7 @@ export interface DrawCallbacks {
   ) => void;
   onColorPicked: (color: [number, number, number, number]) => void;
   onTextureUpdate: () => void;
+  onStrokeEnd: () => void;
 }
 
 // ── Factory ────────────────────────────────────────────────────────────
@@ -412,6 +413,7 @@ export function setupDrawingInput(
     if (!isDrawingPointer(e)) return;
     state.isDrawing = false;
     state.lastPixel = null;
+    callbacks.onStrokeEnd();
   }
 
   function handlePointerLeave(e: PointerEvent): void {

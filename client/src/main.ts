@@ -155,16 +155,31 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-// Delay before accepting server sprite data after drawing stops,
-// to avoid overwriting local strokes with stale server data.
-const DRAW_SETTLE_MS = 500;
+// Ignore incoming sprite data while drawing to avoid overwriting
+// local strokes with stale server data. After drawing stops, request
+// a fresh update from the server that includes all our strokes.
+const DRAW_SETTLE_MS = 300;
 let lastDrawTime = 0;
-let pendingSpriteData: { data: string; width: number; height: number } | null =
-  null;
-let pendingSpriteTimer: ReturnType<typeof setTimeout> | null = null;
+let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
 function markDrawActivity(): void {
   lastDrawTime = Date.now();
+
+  // Reset settle timer — we'll request fresh data after drawing stops
+  if (settleTimer) {
+    clearTimeout(settleTimer);
+    settleTimer = null;
+  }
+}
+
+function scheduleRefresh(): void {
+  if (settleTimer) return;
+  settleTimer = setTimeout(() => {
+    settleTimer = null;
+    if (!drawingState.isDrawing) {
+      sendMessage({ type: "request-sprite-data" });
+    }
+  }, DRAW_SETTLE_MS);
 }
 
 function applySpriteData(
@@ -211,6 +226,9 @@ function applySpriteData(
       onTextureUpdate: () => {
         // Texture already updated by drawing module
       },
+      onStrokeEnd: () => {
+        scheduleRefresh();
+      },
     };
 
     setupDrawingInput(viewport, drawingState, source, drawCallbacks);
@@ -227,26 +245,13 @@ function renderSpriteData(
 ): void {
   const timeSinceDraw = Date.now() - lastDrawTime;
 
-  // If user is actively drawing or just finished, defer the update
-  // so we don't overwrite local strokes with stale server data.
+  // If user is actively drawing or just finished, discard this
+  // server data (it's stale) and schedule a fresh request.
   if (drawingState.isDrawing || timeSinceDraw < DRAW_SETTLE_MS) {
-    pendingSpriteData = { data, width, height };
-
-    if (!pendingSpriteTimer) {
-      pendingSpriteTimer = setTimeout(() => {
-        pendingSpriteTimer = null;
-        if (pendingSpriteData && !drawingState.isDrawing) {
-          const p = pendingSpriteData;
-          pendingSpriteData = null;
-          const rgbaBytes = decodeBase64ToUint8Array(p.data);
-          applySpriteData(viewport, rgbaBytes, p.width, p.height);
-        }
-      }, DRAW_SETTLE_MS);
-    }
+    scheduleRefresh();
     return;
   }
 
-  pendingSpriteData = null;
   const rgbaBytes = decodeBase64ToUint8Array(data);
   applySpriteData(viewport, rgbaBytes, width, height);
 }
