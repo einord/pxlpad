@@ -339,12 +339,6 @@ export function setupDrawingInput(
 
   function handlePointerDown(e: PointerEvent): void {
     if (!isDrawingPointer(e)) return;
-
-    // Stop pen/mouse events from reaching PixiJS's event system entirely,
-    // preventing pixi-viewport's drag/decelerate from consuming them.
-    e.stopImmediatePropagation();
-    e.preventDefault();
-
     if (!state.pixelBuffer) return;
 
     currentPressure = e.pressure;
@@ -362,10 +356,6 @@ export function setupDrawingInput(
 
   function handlePointerMove(e: PointerEvent): void {
     if (!isDrawingPointer(e)) return;
-
-    // Always block pen/mouse from PixiJS, even when not drawing
-    e.stopImmediatePropagation();
-
     if (!state.isDrawing) return;
     if (!state.pixelBuffer) return;
 
@@ -421,10 +411,18 @@ export function setupDrawingInput(
 
   function handlePointerUp(e: PointerEvent): void {
     if (!isDrawingPointer(e)) return;
-    e.stopImmediatePropagation();
     state.isDrawing = false;
     state.lastPixel = null;
     callbacks.onStrokeEnd();
+  }
+
+  function handlePointerCancel(e: PointerEvent): void {
+    if (!isDrawingPointer(e)) return;
+    if (state.isDrawing) {
+      state.isDrawing = false;
+      state.lastPixel = null;
+      callbacks.onStrokeEnd();
+    }
   }
 
   function handlePointerLeave(e: PointerEvent): void {
@@ -440,10 +438,24 @@ export function setupDrawingInput(
   // pen/mouse events before pixi-viewport's drag plugin can consume them.
   const domElement = viewport.options.events!.domElement as HTMLElement;
 
-  domElement.addEventListener("pointerdown", handlePointerDown, true);
-  domElement.addEventListener("pointermove", handlePointerMove, true);
-  domElement.addEventListener("pointerup", handlePointerUp, true);
-  domElement.addEventListener("pointerleave", handlePointerLeave, true);
+  // Ensure touch-action none on the canvas to prevent browser gestures
+  domElement.style.touchAction = "none";
+
+  // Prevent iPadOS Scribble from swallowing rapid Apple Pencil events.
+  // Scribble intercepts fast pen input to detect handwriting, which causes
+  // pointerdown events to be suppressed. preventDefault on touchmove
+  // disables this detection.
+  domElement.addEventListener(
+    "touchmove",
+    (e) => { e.preventDefault(); },
+    { passive: false },
+  );
+
+  domElement.addEventListener("pointerdown", handlePointerDown);
+  domElement.addEventListener("pointermove", handlePointerMove);
+  domElement.addEventListener("pointerup", handlePointerUp);
+  domElement.addEventListener("pointercancel", handlePointerCancel);
+  domElement.addEventListener("pointerleave", handlePointerLeave);
 
   // Suppress currentPressure unused warning — exposed for future use
   void currentPressure;
