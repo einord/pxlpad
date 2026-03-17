@@ -2,5 +2,16 @@
   "name": "pxlpad",
   "version": "0.1.0",
   "private": true,
-  "description": "iPad pixel art editor that syncs with Aseprite in real-time"
+  "description": "iPad pixel art editor that syncs with Aseprite in real-time",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"pnpm --dir server tauri dev\" \"pnpm --dir client dev --host\"",
+    "dev:server": "pnpm --dir server tauri dev",
+    "dev:client": "pnpm --dir client dev --host",
+    "build": "pnpm --dir server tauri build && pnpm --dir client build",
+    "build:server": "pnpm --dir server tauri build",
+    "build:client": "pnpm --dir client build"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }
