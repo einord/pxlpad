@@ -1,10 +1,9 @@
 import {
   Application,
+  Container,
   Graphics,
-  RenderTexture,
   Sprite,
   Texture,
-  TilingSprite,
   BufferImageSource,
 } from "pixi.js";
 import { Viewport } from "pixi-viewport";
@@ -17,11 +16,10 @@ import {
 } from "./drawing.ts";
 import type { ToolType, DrawCallbacks } from "./drawing.ts";
 
-const CHECKERBOARD_SIZE = 16;
-const CHECKERBOARD_COLOR_A = 0xcccccc;
-const CHECKERBOARD_COLOR_B = 0xffffff;
-
 const WS_RECONNECT_INTERVAL_MS = 3000;
+const FRAME_COLOR = 0x1a1a2e;
+const FRAME_SIZE = 10000;
+const BORDER_COLOR = 0x666666;
 
 // ── State ───────────────────────────────────────────────────────────────
 
@@ -40,46 +38,44 @@ let currentTextureSource: BufferImageSource | null = null;
 const drawingState = createDrawingState();
 let ui: ReturnType<typeof createUI> | null = null;
 
-// ── Checkerboard background ─────────────────────────────────────────────
+// ── Sprite frame (dark border outside sprite area) ──────────────────────
 
-async function createCheckerboardBackground(
-  app: Application,
-  viewport: Viewport,
-): Promise<void> {
-  const tileSize = CHECKERBOARD_SIZE * 2;
-  const checkerGfx = new Graphics();
+// Container for the dark "outside" area and border, added to viewport
+let spriteFrame: Container | null = null;
 
-  checkerGfx.rect(0, 0, CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
-  checkerGfx.fill(CHECKERBOARD_COLOR_A);
+function updateSpriteFrame(viewport: Viewport, w: number, h: number): void {
+  if (spriteFrame) {
+    viewport.removeChild(spriteFrame);
+    spriteFrame.destroy({ children: true });
+  }
 
-  checkerGfx.rect(CHECKERBOARD_SIZE, 0, CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
-  checkerGfx.fill(CHECKERBOARD_COLOR_B);
+  spriteFrame = new Container();
 
-  checkerGfx.rect(0, CHECKERBOARD_SIZE, CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
-  checkerGfx.fill(CHECKERBOARD_COLOR_B);
+  const bg = new Graphics();
 
-  checkerGfx.rect(
-    CHECKERBOARD_SIZE,
-    CHECKERBOARD_SIZE,
-    CHECKERBOARD_SIZE,
-    CHECKERBOARD_SIZE,
-  );
-  checkerGfx.fill(CHECKERBOARD_COLOR_A);
+  // Top
+  bg.rect(-FRAME_SIZE, -FRAME_SIZE, w + FRAME_SIZE * 2, FRAME_SIZE);
+  bg.fill(FRAME_COLOR);
+  // Bottom
+  bg.rect(-FRAME_SIZE, h, w + FRAME_SIZE * 2, FRAME_SIZE);
+  bg.fill(FRAME_COLOR);
+  // Left
+  bg.rect(-FRAME_SIZE, 0, FRAME_SIZE, h);
+  bg.fill(FRAME_COLOR);
+  // Right
+  bg.rect(w, 0, FRAME_SIZE, h);
+  bg.fill(FRAME_COLOR);
 
-  const renderTexture = RenderTexture.create({
-    width: tileSize,
-    height: tileSize,
-  });
-  app.renderer.render({ container: checkerGfx, target: renderTexture });
+  spriteFrame.addChild(bg);
 
-  const tilingSprite = new TilingSprite({
-    texture: renderTexture,
-    width: 4096,
-    height: 4096,
-  });
-  tilingSprite.position.set(-2048, -2048);
+  // 1px border around sprite area
+  const border = new Graphics();
+  border.rect(-1, -1, w + 2, h + 2);
+  border.stroke({ color: BORDER_COLOR, width: 1, alignment: 0 });
+  spriteFrame.addChild(border);
 
-  viewport.addChildAt(tilingSprite, 0);
+  // Insert at bottom of viewport (behind sprite)
+  viewport.addChildAt(spriteFrame, 0);
 }
 
 // ── PixiJS application ──────────────────────────────────────────────────
@@ -88,7 +84,7 @@ async function createApp(): Promise<Application> {
   const app = new Application();
 
   await app.init({
-    background: 0x1a1a2e,
+    backgroundAlpha: 0,
     resizeTo: window,
     antialias: false,
     resolution: window.devicePixelRatio || 1,
@@ -189,6 +185,9 @@ function applySpriteData(
   height: number,
 ): void {
   updatePixelBuffer(drawingState, rgbaBytes, width, height);
+
+  // Update dark frame and border around sprite
+  updateSpriteFrame(viewport, width, height);
 
   if (currentTextureSource && currentSprite) {
     currentTextureSource.resource = rgbaBytes;
@@ -420,8 +419,6 @@ async function main(): Promise<void> {
     const py = Math.floor(world.y);
     ui?.setCursorPosition(px, py);
   });
-
-  await createCheckerboardBackground(app, viewport);
 
   connectWebSocket(viewport);
 
