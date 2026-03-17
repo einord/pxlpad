@@ -315,19 +315,6 @@ export function setupDrawingInput(
 ): void {
   let currentPressure = 0.5;
 
-  // We need to suppress viewport dragging while drawing with pen/mouse.
-  // pixi-viewport only respects the `pause` flag checked at the event level,
-  // but we can temporarily disable the drag plugin and re-enable on pointerup.
-  function pauseViewportDrag(): void {
-    const drag = viewport.plugins.get("drag");
-    if (drag) drag.pause();
-  }
-
-  function resumeViewportDrag(): void {
-    const drag = viewport.plugins.get("drag");
-    if (drag) drag.resume();
-  }
-
   function isDrawingPointer(e: PointerEvent): boolean {
     return e.pointerType === "pen" || e.pointerType === "mouse";
   }
@@ -353,12 +340,8 @@ export function setupDrawingInput(
     if (!isDrawingPointer(e)) return;
     if (!state.pixelBuffer) return;
 
-    // Prevent viewport drag from consuming this event
-    e.stopPropagation();
-
     currentPressure = e.pressure;
     state.isDrawing = true;
-    pauseViewportDrag();
 
     const pixel = screenToPixel(e);
     if (!pixel) {
@@ -429,7 +412,6 @@ export function setupDrawingInput(
     if (!isDrawingPointer(e)) return;
     state.isDrawing = false;
     state.lastPixel = null;
-    resumeViewportDrag();
   }
 
   function handlePointerLeave(e: PointerEvent): void {
@@ -437,7 +419,6 @@ export function setupDrawingInput(
     if (state.isDrawing) {
       state.isDrawing = false;
       state.lastPixel = null;
-      resumeViewportDrag();
     }
   }
 

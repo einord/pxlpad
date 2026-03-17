@@ -111,11 +111,21 @@ function setupViewport(app: Application): Viewport {
   });
 
   viewport
-    .drag({ mouseButtons: "all" })
+    .drag({ mouseButtons: "all", pressDrag: false })
     .pinch()
     .wheel({ smooth: 3, trackpadPinch: true, wheelZoom: false })
     .decelerate()
     .clampZoom({ minScale: 0.1, maxScale: 40 });
+
+  // Prevent browser-level pinch zoom (trackpad sends ctrl+wheel)
+  const canvas = app.canvas as HTMLCanvasElement;
+  canvas.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    },
+    { passive: false },
+  );
 
   app.stage.addChild(viewport);
 
@@ -145,15 +155,24 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-function renderSpriteData(
+// Delay before accepting server sprite data after drawing stops,
+// to avoid overwriting local strokes with stale server data.
+const DRAW_SETTLE_MS = 500;
+let lastDrawTime = 0;
+let pendingSpriteData: { data: string; width: number; height: number } | null =
+  null;
+let pendingSpriteTimer: ReturnType<typeof setTimeout> | null = null;
+
+function markDrawActivity(): void {
+  lastDrawTime = Date.now();
+}
+
+function applySpriteData(
   viewport: Viewport,
-  data: string,
+  rgbaBytes: Uint8Array,
   width: number,
   height: number,
 ): void {
-  const rgbaBytes = decodeBase64ToUint8Array(data);
-
-  // Update the drawing state's local pixel buffer
   updatePixelBuffer(drawingState, rgbaBytes, width, height);
 
   if (currentTextureSource && currentSprite) {
@@ -181,6 +200,7 @@ function renderSpriteData(
     // Set up drawing input now that we have a texture source
     const drawCallbacks: DrawCallbacks = {
       onDraw: (x, y, color, tool) => {
+        markDrawActivity();
         sendMessage({ type: "draw", x, y, color, tool });
       },
       onColorPicked: (color) => {
@@ -197,6 +217,38 @@ function renderSpriteData(
   }
 
   ui?.setStatus("Synced", true);
+}
+
+function renderSpriteData(
+  viewport: Viewport,
+  data: string,
+  width: number,
+  height: number,
+): void {
+  const timeSinceDraw = Date.now() - lastDrawTime;
+
+  // If user is actively drawing or just finished, defer the update
+  // so we don't overwrite local strokes with stale server data.
+  if (drawingState.isDrawing || timeSinceDraw < DRAW_SETTLE_MS) {
+    pendingSpriteData = { data, width, height };
+
+    if (!pendingSpriteTimer) {
+      pendingSpriteTimer = setTimeout(() => {
+        pendingSpriteTimer = null;
+        if (pendingSpriteData && !drawingState.isDrawing) {
+          const p = pendingSpriteData;
+          pendingSpriteData = null;
+          const rgbaBytes = decodeBase64ToUint8Array(p.data);
+          applySpriteData(viewport, rgbaBytes, p.width, p.height);
+        }
+      }, DRAW_SETTLE_MS);
+    }
+    return;
+  }
+
+  pendingSpriteData = null;
+  const rgbaBytes = decodeBase64ToUint8Array(data);
+  applySpriteData(viewport, rgbaBytes, width, height);
 }
 
 // ── WebSocket ───────────────────────────────────────────────────────────
