@@ -339,6 +339,12 @@ export function setupDrawingInput(
 
   function handlePointerDown(e: PointerEvent): void {
     if (!isDrawingPointer(e)) return;
+
+    // Stop pen/mouse events from reaching PixiJS's event system entirely,
+    // preventing pixi-viewport's drag/decelerate from consuming them.
+    e.stopImmediatePropagation();
+    e.preventDefault();
+
     if (!state.pixelBuffer) return;
 
     currentPressure = e.pressure;
@@ -355,8 +361,12 @@ export function setupDrawingInput(
   }
 
   function handlePointerMove(e: PointerEvent): void {
-    if (!state.isDrawing) return;
     if (!isDrawingPointer(e)) return;
+
+    // Always block pen/mouse from PixiJS, even when not drawing
+    e.stopImmediatePropagation();
+
+    if (!state.isDrawing) return;
     if (!state.pixelBuffer) return;
 
     currentPressure = e.pressure;
@@ -411,6 +421,7 @@ export function setupDrawingInput(
 
   function handlePointerUp(e: PointerEvent): void {
     if (!isDrawingPointer(e)) return;
+    e.stopImmediatePropagation();
     state.isDrawing = false;
     state.lastPixel = null;
     callbacks.onStrokeEnd();
@@ -421,6 +432,7 @@ export function setupDrawingInput(
     if (state.isDrawing) {
       state.isDrawing = false;
       state.lastPixel = null;
+      callbacks.onStrokeEnd();
     }
   }
 
