@@ -9,9 +9,13 @@
     "dev:client": "pnpm --dir client dev --host",
     "build": "pnpm --dir server tauri build && pnpm --dir client build",
     "build:server": "pnpm --dir server tauri build",
-    "build:client": "pnpm --dir client build"
+    "build:client": "pnpm --dir client build",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "concurrently": "^9.1.2",
+    "husky": "^9.1.7"
   }
 }
