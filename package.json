@@ -10,6 +10,7 @@
     "build": "pnpm --dir server tauri build && pnpm --dir client build",
     "build:server": "pnpm --dir server tauri build",
     "build:client": "pnpm --dir client build",
+    "ext:pack": "cd extension && zip -r /tmp/pxlpad.aseprite-extension package.json plugin.lua",
     "prepare": "husky"
   },
   "devDependencies": {
