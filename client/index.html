@@ -9,6 +9,20 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Pxlpad</title>
     <style>
+      :root {
+        --ui-bg: rgba(51, 51, 51, 0.92);
+        --ui-bg-solid: #333;
+        --ui-btn: #555;
+        --ui-btn-hover: #666;
+        --ui-btn-active: #888;
+        --ui-text: #ddd;
+        --ui-text-muted: #999;
+        --ui-border: #444;
+        --ui-accent: #6a9fd8;
+        --ui-touch-min: 44px;
+        --ui-panel-radius: 6px;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -18,20 +32,24 @@
         width: 100%;
         height: 100%;
         overflow: hidden;
-        background: #1a1a2e;
         touch-action: none;
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
-      }
-      canvas {
-        display: block;
-        width: 100% !important;
-        height: 100% !important;
+        /* Static checkerboard — visible through transparent canvas/sprite pixels */
+        background-color: #bbb;
+        background-image:
+          linear-gradient(45deg, #999 25%, transparent 25%),
+          linear-gradient(-45deg, #999 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #999 75%),
+          linear-gradient(-45deg, transparent 75%, #999 75%);
+        background-size: 16px 16px;
+        background-position: 0 0, 0 8px, 8px -8px, -8px 0;
       }
     </style>
   </head>
   <body>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

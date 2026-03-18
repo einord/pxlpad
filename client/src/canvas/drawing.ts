@@ -26,6 +26,7 @@ export interface DrawCallbacks {
   ) => void;
   onColorPicked: (color: [number, number, number, number]) => void;
   onTextureUpdate: () => void;
+  onStrokeEnd: () => void;
 }
 
 // ── Factory ────────────────────────────────────────────────────────────
@@ -315,19 +316,6 @@ export function setupDrawingInput(
 ): void {
   let currentPressure = 0.5;
 
-  // We need to suppress viewport dragging while drawing with pen/mouse.
-  // pixi-viewport only respects the `pause` flag checked at the event level,
-  // but we can temporarily disable the drag plugin and re-enable on pointerup.
-  function pauseViewportDrag(): void {
-    const drag = viewport.plugins.get("drag");
-    if (drag) drag.pause();
-  }
-
-  function resumeViewportDrag(): void {
-    const drag = viewport.plugins.get("drag");
-    if (drag) drag.resume();
-  }
-
   function isDrawingPointer(e: PointerEvent): boolean {
     return e.pointerType === "pen" || e.pointerType === "mouse";
   }
@@ -355,7 +343,6 @@ export function setupDrawingInput(
 
     currentPressure = e.pressure;
     state.isDrawing = true;
-    pauseViewportDrag();
 
     const pixel = screenToPixel(e);
     if (!pixel) {
@@ -368,8 +355,8 @@ export function setupDrawingInput(
   }
 
   function handlePointerMove(e: PointerEvent): void {
-    if (!state.isDrawing) return;
     if (!isDrawingPointer(e)) return;
+    if (!state.isDrawing) return;
     if (!state.pixelBuffer) return;
 
     currentPressure = e.pressure;
@@ -426,7 +413,16 @@ export function setupDrawingInput(
     if (!isDrawingPointer(e)) return;
     state.isDrawing = false;
     state.lastPixel = null;
-    resumeViewportDrag();
+    callbacks.onStrokeEnd();
+  }
+
+  function handlePointerCancel(e: PointerEvent): void {
+    if (!isDrawingPointer(e)) return;
+    if (state.isDrawing) {
+      state.isDrawing = false;
+      state.lastPixel = null;
+      callbacks.onStrokeEnd();
+    }
   }
 
   function handlePointerLeave(e: PointerEvent): void {
@@ -434,16 +430,31 @@ export function setupDrawingInput(
     if (state.isDrawing) {
       state.isDrawing = false;
       state.lastPixel = null;
-      resumeViewportDrag();
+      callbacks.onStrokeEnd();
     }
   }
 
-  // Attach to the canvas element that pixi-viewport renders into
+  // Attach to the canvas element — use capture phase so we handle
+  // pen/mouse events before pixi-viewport's drag plugin can consume them.
   const domElement = viewport.options.events!.domElement as HTMLElement;
+
+  // Ensure touch-action none on the canvas to prevent browser gestures
+  domElement.style.touchAction = "none";
+
+  // Prevent iPadOS Scribble from swallowing rapid Apple Pencil events.
+  // Scribble intercepts fast pen input to detect handwriting, which causes
+  // pointerdown events to be suppressed. preventDefault on touchmove
+  // disables this detection.
+  domElement.addEventListener(
+    "touchmove",
+    (e) => { e.preventDefault(); },
+    { passive: false },
+  );
 
   domElement.addEventListener("pointerdown", handlePointerDown);
   domElement.addEventListener("pointermove", handlePointerMove);
   domElement.addEventListener("pointerup", handlePointerUp);
+  domElement.addEventListener("pointercancel", handlePointerCancel);
   domElement.addEventListener("pointerleave", handlePointerLeave);
 
   // Suppress currentPressure unused warning — exposed for future use
