@@ -22,6 +22,7 @@ import {
 import type { DrawCallbacks } from "./canvas/drawing.ts";
 
 import { useDrawingState } from "./composables/useDrawingState.ts";
+import type { RGBA } from "./composables/useDrawingState.ts";
 import { useEditorState } from "./composables/useEditorState.ts";
 import { useWebSocket } from "./composables/useWebSocket.ts";
 
@@ -31,6 +32,7 @@ const {
   state: drawingReactive,
   setForegroundColor,
   addRecentColor,
+  setPalette,
 } = useDrawingState();
 const { setSpriteName, setCursorPosition, setZoomLevel, setStatus } =
   useEditorState();
@@ -260,6 +262,13 @@ onMounted(async () => {
       case "sprite-update": {
         console.log("[WS] Sprite update notification");
         sendMessage({ type: "request-sprite-data" });
+        break;
+      }
+
+      case "palette-data": {
+        const colors = msg.colors as number[][];
+        console.log(`[WS] Palette received (${colors.length} colors)`);
+        setPalette(colors.map((c) => [c[0], c[1], c[2], c[3]] as RGBA));
         break;
       }
 

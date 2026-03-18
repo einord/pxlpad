@@ -160,7 +160,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, state: SharedSta
                     }
 
                     // --- Extension → Clients ---
-                    "sprite-list" | "sprite-data" | "sprite-update" => {
+                    "sprite-list" | "sprite-data" | "sprite-update" | "palette-data" => {
                         let s = state.read().await;
                         // Verify sender is an extension.
                         let is_extension = s
@@ -180,7 +180,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, state: SharedSta
                     }
 
                     // --- Client → Extension ---
-                    "request-sprite-list" | "request-sprite-data" | "draw" => {
+                    "request-sprite-list" | "request-sprite-data" | "request-palette" | "draw" => {
                         let s = state.read().await;
                         // Verify sender is a client.
                         let is_client = s
