@@ -136,9 +136,9 @@ function applySpriteData(
     setZoomLevel(fitScale * 100);
 
     const drawCallbacks: DrawCallbacks = {
-      onDraw: (x, y, color, tool) => {
+      onDraw: (x, y, color, tool, brushSize) => {
         markDrawActivity();
-        sendMessage({ type: "draw", x, y, color, tool });
+        sendMessage({ type: "draw", x, y, color, tool, brushSize });
       },
       onColorPicked: (color) => {
         drawingState.foregroundColor = color;

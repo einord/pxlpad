@@ -23,6 +23,7 @@ export interface DrawCallbacks {
     y: number,
     color: [number, number, number, number],
     tool: string,
+    brushSize: number,
   ) => void;
   onColorPicked: (color: [number, number, number, number]) => void;
   onTextureUpdate: () => void;
@@ -117,20 +118,42 @@ function colorsEqual(
 
 // ── Drawing primitives ─────────────────────────────────────────────────
 
-function drawPixel(
+/**
+ * Draws a filled square brush of `state.brushSize` pixels centered on (cx, cy).
+ * For brushSize 1 this draws a single pixel.
+ * For brushSize 2+ every pixel in the square is written to the buffer, but
+ * `callbacks.onDraw` is only called once with the center coordinate.
+ */
+function drawBrush(
   state: DrawingState,
   textureSource: BufferImageSource,
-  x: number,
-  y: number,
+  cx: number,
+  cy: number,
   color: [number, number, number, number],
   callbacks: DrawCallbacks,
   skipTextureUpdate: boolean,
 ): void {
   if (!state.pixelBuffer) return;
-  if (x < 0 || y < 0 || x >= state.spriteWidth || y >= state.spriteHeight)
-    return;
 
-  setPixelInBuffer(state.pixelBuffer, x, y, state.spriteWidth, color);
+  const size = state.brushSize;
+  const w = state.spriteWidth;
+  const h = state.spriteHeight;
+  const half = Math.floor(size / 2);
+
+  // Write all pixels in the brush square to the buffer
+  let anyDrawn = false;
+  for (let dy = -half; dy < size - half; dy++) {
+    for (let dx = -half; dx < size - half; dx++) {
+      const px = cx + dx;
+      const py = cy + dy;
+      if (px >= 0 && py >= 0 && px < w && py < h) {
+        setPixelInBuffer(state.pixelBuffer, px, py, w, color);
+        anyDrawn = true;
+      }
+    }
+  }
+
+  if (!anyDrawn) return;
 
   // Sync the texture source resource to our buffer
   textureSource.resource = state.pixelBuffer;
@@ -140,12 +163,13 @@ function drawPixel(
     callbacks.onTextureUpdate();
   }
 
-  callbacks.onDraw(x, y, color, state.tool);
+  // Single callback for the whole brush stamp
+  callbacks.onDraw(cx, cy, color, state.tool, size);
 }
 
 /**
  * Bresenham's line algorithm — ensures no gaps even with fast pen movement.
- * Returns the list of pixel coordinates drawn.
+ * Uses drawBrush at each step to support variable brush sizes.
  */
 function drawLine(
   state: DrawingState,
@@ -165,7 +189,7 @@ function drawLine(
 
   for (;;) {
     // Draw but skip per-pixel texture update — we batch at the end
-    drawPixel(state, textureSource, x0, y0, color, callbacks, true);
+    drawBrush(state, textureSource, x0, y0, color, callbacks, true);
 
     if (x0 === x1 && y0 === y1) break;
 
@@ -221,7 +245,7 @@ function floodFill(
     if (!colorsEqual(current, targetColor)) continue;
 
     setPixelInBuffer(state.pixelBuffer!, x, y, w, fillColor);
-    callbacks.onDraw(x, y, fillColor, "fill");
+    callbacks.onDraw(x, y, fillColor, "fill", 1);
 
     stack.push({ x: x + 1, y });
     stack.push({ x: x - 1, y });
@@ -261,7 +285,7 @@ function applyToolAtPixel(
 ): void {
   switch (state.tool) {
     case "pencil":
-      drawPixel(
+      drawBrush(
         state,
         textureSource,
         x,
@@ -272,7 +296,7 @@ function applyToolAtPixel(
       );
       break;
     case "eraser":
-      drawPixel(state, textureSource, x, y, [0, 0, 0, 0], callbacks, false);
+      drawBrush(state, textureSource, x, y, [0, 0, 0, 0], callbacks, false);
       break;
     case "eyedropper":
       pickColor(state, x, y, callbacks);
