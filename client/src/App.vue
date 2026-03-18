@@ -48,7 +48,7 @@ function syncDrawingState() {
 }
 
 // Draw activity tracking
-const DRAW_SETTLE_MS = 300;
+const DRAW_SETTLE_MS = 800;
 let lastDrawTime = 0;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -149,6 +149,7 @@ function applySpriteData(
         // Texture already updated by drawing module
       },
       onStrokeEnd: () => {
+        markDrawActivity();
         scheduleRefresh();
       },
     };

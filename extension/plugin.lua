@@ -221,26 +221,66 @@ local function handleDrawCommand(data)
   local y = data.y
   local color = data.color
 
-  if not x or not y or not color then return end
+  if not x or not y then
+    print("[pxlpad] draw: missing x or y")
+    return
+  end
+  if not color then
+    print("[pxlpad] draw: missing color, keys: " .. tostring(data))
+    return
+  end
 
   local r = color[1] or 0
   local g = color[2] or 0
   local b = color[3] or 0
   local a = color[4] or 255
 
-  local cel = app.cel
-  if not cel then return end
+  local sprite = app.sprite
+  if not sprite then
+    print("[pxlpad] draw: no active sprite")
+    return
+  end
 
+  if x < 0 or x >= sprite.width or y < 0 or y >= sprite.height then
+    return
+  end
+
+  local cel = app.cel
   suppressChange = true
 
   app.transaction("Pxlpad Draw", function()
-    local img = cel.image
-    local celPos = cel.position
-    local localX = x - celPos.x
-    local localY = y - celPos.y
+    if cel then
+      local img = cel.image:clone()
+      local celPos = cel.position
+      local localX = x - celPos.x
+      local localY = y - celPos.y
 
-    if localX >= 0 and localX < img.width and localY >= 0 and localY < img.height then
-      img:drawPixel(localX, localY, app.pixelColor.rgba(r, g, b, a))
+      -- If pixel is within current cel bounds, draw directly
+      if localX >= 0 and localX < img.width and localY >= 0 and localY < img.height then
+        img:drawPixel(localX, localY, app.pixelColor.rgba(r, g, b, a))
+        cel.image = img
+      else
+        -- Expand cel to include the new pixel
+        local newX = math.min(celPos.x, x)
+        local newY = math.min(celPos.y, y)
+        local newW = math.max(celPos.x + img.width, x + 1) - newX
+        local newH = math.max(celPos.y + img.height, y + 1) - newY
+
+        local newImg = Image(newW, newH, sprite.colorMode)
+        newImg:clear()
+        newImg:drawImage(img, celPos.x - newX, celPos.y - newY)
+        newImg:drawPixel(x - newX, y - newY, app.pixelColor.rgba(r, g, b, a))
+        cel.image = newImg
+        cel.position = Point(newX, newY)
+      end
+    else
+      -- No cel exists — create one with a single pixel
+      local layer = app.layer
+      if not layer then return end
+      local frameNum = app.frame and app.frame.frameNumber or 1
+      local newImg = Image(1, 1, sprite.colorMode)
+      newImg:drawPixel(0, 0, app.pixelColor.rgba(r, g, b, a))
+      sprite:newCel(layer, frameNum, newImg, Point(x, y))
     end
   end)
 
