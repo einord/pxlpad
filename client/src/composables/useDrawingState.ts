@@ -9,6 +9,7 @@ interface DrawingState {
   backgroundColor: RGBA;
   brushSize: number;
   recentColors: RGBA[];
+  palette: RGBA[];
 }
 
 const state = reactive<DrawingState>({
@@ -17,6 +18,7 @@ const state = reactive<DrawingState>({
   backgroundColor: [255, 255, 255, 255],
   brushSize: 1,
   recentColors: [],
+  palette: [],
 });
 
 export function useDrawingState() {
@@ -42,6 +44,10 @@ export function useDrawingState() {
     state.backgroundColor = tmp;
   }
 
+  function setPalette(colors: RGBA[]) {
+    state.palette = colors;
+  }
+
   function addRecentColor(color: RGBA) {
     const idx = state.recentColors.findIndex(
       (c) =>
@@ -63,5 +69,6 @@ export function useDrawingState() {
     setBrushSize,
     swapColors,
     addRecentColor,
+    setPalette,
   };
 }

@@ -190,6 +190,24 @@ local function attachSpriteListener(sprite)
   end)
 end
 
+local function sendPaletteData(sprite)
+  if not connected or not ws or not sprite then return end
+
+  local palette = sprite.palettes[1]
+  if not palette then return end
+
+  local colors = {}
+  for i = 0, #palette - 1 do
+    local c = palette:getColor(i)
+    colors[#colors + 1] = { c.red, c.green, c.blue, c.alpha }
+  end
+
+  ws:sendText(jsonEncode({
+    type = "palette-data",
+    colors = colors,
+  }))
+end
+
 local function sendSpriteList()
   if not connected or not ws then return end
 
@@ -344,9 +362,10 @@ local function onConnected()
   -- Send sprite list
   sendSpriteList()
 
-  -- Send initial sprite data if there is an active sprite
+  -- Send initial sprite data and palette if there is an active sprite
   if app.sprite then
     sendSpriteData(app.sprite)
+    sendPaletteData(app.sprite)
     attachSpriteListener(app.sprite)
   end
 end
@@ -367,6 +386,10 @@ local function onMessage(data)
   elseif msg.type == "request-sprite-data" then
     if app.sprite then
       sendSpriteData(app.sprite)
+    end
+  elseif msg.type == "request-palette" then
+    if app.sprite then
+      sendPaletteData(app.sprite)
     end
   elseif msg.type == "draw" then
     handleDrawCommand(msg)

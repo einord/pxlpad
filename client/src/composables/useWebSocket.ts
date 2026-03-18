@@ -39,6 +39,7 @@ export function useWebSocket() {
 
         sendMessage({ type: "register", role: "client" });
         sendMessage({ type: "request-sprite-list" });
+        sendMessage({ type: "request-palette" });
       });
 
       ws.addEventListener("message", (event: MessageEvent) => {

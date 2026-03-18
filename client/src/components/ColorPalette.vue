@@ -20,6 +20,12 @@ function recentColorAt(index: number): RGBA {
     ? state.recentColors[index]
     : emptyColor;
 }
+
+function selectPaletteColor(index: number) {
+  if (index < state.palette.length) {
+    setForegroundColor([...state.palette[index]] as RGBA);
+  }
+}
 </script>
 
 <template>
@@ -31,7 +37,21 @@ function recentColorAt(index: number): RGBA {
       <ArrowRightLeft :size="14" :stroke-width="2" />
     </PxlButton>
 
-    <span class="recent-label">Recent</span>
+    <template v-if="state.palette.length > 0">
+      <span class="section-label">Palette</span>
+
+      <div class="pxl-palette-colors">
+        <ColorSwatch
+          v-for="(color, i) in state.palette"
+          :key="'pal-' + i"
+          :color="color"
+          variant="recent"
+          @click="selectPaletteColor(i)"
+        />
+      </div>
+    </template>
+
+    <span class="section-label">Recent</span>
 
     <div class="pxl-recent-colors">
       <ColorSwatch
@@ -80,12 +100,13 @@ function recentColorAt(index: number): RGBA {
   margin-top: -6px;
 }
 
-.recent-label {
+.section-label {
   font-size: 10px;
   color: var(--ui-text-muted);
   margin-top: 4px;
 }
 
+.pxl-palette-colors,
 .pxl-recent-colors {
   display: grid;
   grid-template-columns: 1fr 1fr;
