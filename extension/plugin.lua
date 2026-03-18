@@ -330,6 +330,12 @@ local function onMessage(data)
     end
   elseif msg.type == "draw" then
     handleDrawCommand(msg)
+  elseif msg.type == "undo" then
+    app.command.Undo()
+    sendSpriteData(app.sprite)
+  elseif msg.type == "redo" then
+    app.command.Redo()
+    sendSpriteData(app.sprite)
   end
 end
 
