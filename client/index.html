@@ -9,6 +9,20 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Pxlpad</title>
     <style>
+      :root {
+        --ui-bg: rgba(51, 51, 51, 0.92);
+        --ui-bg-solid: #333;
+        --ui-btn: #555;
+        --ui-btn-hover: #666;
+        --ui-btn-active: #888;
+        --ui-text: #ddd;
+        --ui-text-muted: #999;
+        --ui-border: #444;
+        --ui-accent: #6a9fd8;
+        --ui-touch-min: 44px;
+        --ui-panel-radius: 6px;
+      }
+
       * {
         margin: 0;
         padding: 0;
@@ -32,14 +46,10 @@
         background-size: 16px 16px;
         background-position: 0 0, 0 8px, 8px -8px, -8px 0;
       }
-      canvas {
-        display: block;
-        width: 100% !important;
-        height: 100% !important;
-      }
     </style>
   </head>
   <body>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -28,6 +28,7 @@ pnpm ext:pack     # Package extension to /tmp/pxlpad.aseprite-extension
 
 ### Principles
 - **Single responsibility** — each file, function, and module should do one thing well
+- **Reuse first** — before creating new UI, check if an existing component can be reused or extended. Every button, panel, toolbar, input, and visual element should be a reusable component. Only create a new component when nothing existing fits.
 - **Ask rather than guess** — when requirements, design decisions, or expected behavior are unclear, ask the user before making assumptions
 - All code, comments, and variable names in English
 - Prefer simple, direct solutions over abstractions
@@ -36,18 +37,21 @@ pnpm ext:pack     # Package extension to /tmp/pxlpad.aseprite-extension
 ### File organization
 - **Max 400 lines per file** — if a file exceeds this, split it by responsibility
 - **Co-locate related files** using nested naming for IDE grouping:
-  - `toolbar.ts` — logic
-  - `toolbar.css.ts` — styles (if separated)
-  - `toolbar.types.ts` — types (if complex enough)
+  - `Toolbar.vue` — component
+  - `Toolbar.types.ts` — types (if complex enough)
 - Place new files next to related code, not in a flat global folder
-- Client structure: `client/src/` with logical groupings as the project grows
+- Client structure:
+  - `client/src/components/` — reusable Vue components (buttons, panels, swatches)
+  - `client/src/composables/` — Vue composables (shared reactive state, WebSocket)
+  - `client/src/canvas/` — PixiJS/drawing logic (vanilla TS, not Vue)
 - Server structure: Rust in `server/src-tauri/src/`, frontend in `server/src/`
 
-### TypeScript (client/)
+### Vue & TypeScript (client/)
+- Vue 3 with `<script setup lang="ts">` and Composition API
+- PixiJS canvas and drawing logic stays as vanilla TypeScript — not wrapped in Vue
 - Strict TypeScript — no `any`, no `as` casts unless unavoidable
 - Functions should be short and well-named — avoid comments when the code is self-explanatory
 - Use `interface` for object shapes, `type` for unions/aliases
-- Group code with section headers: `// ── Section name ──────`
 - Imports from pixi.js should be specific, not `import * as PIXI`
 
 ### Rust (server/src-tauri/)
