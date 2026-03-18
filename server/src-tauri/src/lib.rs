@@ -180,7 +180,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr, state: SharedSta
                     }
 
                     // --- Client → Extension ---
-                    "request-sprite-list" | "request-sprite-data" | "request-palette" | "draw" => {
+                    "request-sprite-list" | "request-sprite-data" | "request-palette" | "draw" | "undo" | "redo" => {
                         let s = state.read().await;
                         // Verify sender is a client.
                         let is_client = s

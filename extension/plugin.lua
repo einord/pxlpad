@@ -238,6 +238,7 @@ local function handleDrawCommand(data)
   local x = data.x
   local y = data.y
   local color = data.color
+  local brushSize = data.brushSize or 1
 
   if not x or not y then
     print("[pxlpad] draw: missing x or y")
@@ -259,9 +260,20 @@ local function handleDrawCommand(data)
     return
   end
 
-  if x < 0 or x >= sprite.width or y < 0 or y >= sprite.height then
-    return
+  -- Collect all pixels to draw (brush square centered on x,y)
+  local pixels = {}
+  local half = math.floor(brushSize / 2)
+  for dy = -half, brushSize - half - 1 do
+    for dx = -half, brushSize - half - 1 do
+      local px = x + dx
+      local py = y + dy
+      if px >= 0 and px < sprite.width and py >= 0 and py < sprite.height then
+        pixels[#pixels + 1] = { x = px, y = py }
+      end
+    end
   end
+
+  if #pixels == 0 then return end
 
   local cel = app.cel
   suppressChange = true
@@ -270,35 +282,63 @@ local function handleDrawCommand(data)
     if cel then
       local img = cel.image:clone()
       local celPos = cel.position
-      local localX = x - celPos.x
-      local localY = y - celPos.y
 
-      -- If pixel is within current cel bounds, draw directly
-      if localX >= 0 and localX < img.width and localY >= 0 and localY < img.height then
-        img:drawPixel(localX, localY, app.pixelColor.rgba(r, g, b, a))
-        cel.image = img
-      else
-        -- Expand cel to include the new pixel
-        local newX = math.min(celPos.x, x)
-        local newY = math.min(celPos.y, y)
-        local newW = math.max(celPos.x + img.width, x + 1) - newX
-        local newH = math.max(celPos.y + img.height, y + 1) - newY
+      -- Calculate bounding box including all brush pixels
+      local minX = celPos.x
+      local minY = celPos.y
+      local maxX = celPos.x + img.width - 1
+      local maxY = celPos.y + img.height - 1
 
+      for _, p in ipairs(pixels) do
+        if p.x < minX then minX = p.x end
+        if p.y < minY then minY = p.y end
+        if p.x > maxX then maxX = p.x end
+        if p.y > maxY then maxY = p.y end
+      end
+
+      -- Check if we need to expand the cel
+      if minX < celPos.x or minY < celPos.y or maxX >= celPos.x + img.width or maxY >= celPos.y + img.height then
+        local newW = maxX - minX + 1
+        local newH = maxY - minY + 1
         local newImg = Image(newW, newH, sprite.colorMode)
         newImg:clear()
-        newImg:drawImage(img, celPos.x - newX, celPos.y - newY)
-        newImg:drawPixel(x - newX, y - newY, app.pixelColor.rgba(r, g, b, a))
+        newImg:drawImage(img, celPos.x - minX, celPos.y - minY)
+
+        for _, p in ipairs(pixels) do
+          newImg:drawPixel(p.x - minX, p.y - minY, app.pixelColor.rgba(r, g, b, a))
+        end
+
         cel.image = newImg
-        cel.position = Point(newX, newY)
+        cel.position = Point(minX, minY)
+      else
+        for _, p in ipairs(pixels) do
+          img:drawPixel(p.x - celPos.x, p.y - celPos.y, app.pixelColor.rgba(r, g, b, a))
+        end
+        cel.image = img
       end
     else
-      -- No cel exists — create one with a single pixel
+      -- No cel exists — create one covering the brush area
       local layer = app.layer
       if not layer then return end
       local frameNum = app.frame and app.frame.frameNumber or 1
-      local newImg = Image(1, 1, sprite.colorMode)
-      newImg:drawPixel(0, 0, app.pixelColor.rgba(r, g, b, a))
-      sprite:newCel(layer, frameNum, newImg, Point(x, y))
+
+      local minX = pixels[1].x
+      local minY = pixels[1].y
+      local maxX = pixels[1].x
+      local maxY = pixels[1].y
+      for i = 2, #pixels do
+        if pixels[i].x < minX then minX = pixels[i].x end
+        if pixels[i].y < minY then minY = pixels[i].y end
+        if pixels[i].x > maxX then maxX = pixels[i].x end
+        if pixels[i].y > maxY then maxY = pixels[i].y end
+      end
+
+      local newImg = Image(maxX - minX + 1, maxY - minY + 1, sprite.colorMode)
+      newImg:clear()
+      for _, p in ipairs(pixels) do
+        newImg:drawPixel(p.x - minX, p.y - minY, app.pixelColor.rgba(r, g, b, a))
+      end
+      sprite:newCel(layer, frameNum, newImg, Point(minX, minY))
     end
   end)
 
@@ -353,6 +393,12 @@ local function onMessage(data)
     end
   elseif msg.type == "draw" then
     handleDrawCommand(msg)
+  elseif msg.type == "undo" then
+    app.command.Undo()
+    sendSpriteData(app.sprite)
+  elseif msg.type == "redo" then
+    app.command.Redo()
+    sendSpriteData(app.sprite)
   end
 end
 
