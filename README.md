@@ -1,3 +1,6 @@
+> This repository has moved to:
+> https://forgejo.nyqvist.app/jonte/pxlpad
+
 # Pxlpad
 
 **Draw pixel art on your iPad — synced live with Aseprite on your desktop.**
